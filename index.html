@@ -149,17 +149,59 @@
     FB.api(
       '/' + page.id + '/conversations',
       'GET',
-      { access_token: page.access_token, fields: 'participants,updated_time,snippet' },
+      { access_token: page.access_token, fields: 'participants,updated_time' },
       function (convResponse) {
         if (!convResponse || convResponse.error) {
           setStatus('Error calling /' + page.id + '/conversations: ' + JSON.stringify(convResponse && convResponse.error));
           return;
         }
-        setStatus('Retrieved ' + (convResponse.data ? convResponse.data.length : 0) + ' conversation thread(s).');
-        showOutput(convResponse);
+        const threads = convResponse.data || [];
+        setStatus('Found ' + threads.length + ' conversation thread(s). Fetching messages...');
+        fetchMessagesForThreads(threads, page);
       }
     );
   });
+
+  function fetchMessagesForThreads(threads, page) {
+    let remaining = threads.length;
+    const results = [];
+
+    if (remaining === 0) {
+      setStatus('No conversation threads found on this Page.');
+      showOutput({ threads: [] });
+      return;
+    }
+
+    threads.forEach(function (thread) {
+      FB.api(
+        '/' + thread.id + '/messages',
+        'GET',
+        { access_token: page.access_token, fields: 'message,from,created_time' },
+        function (msgResponse) {
+          remaining -= 1;
+
+          const allMessages = (msgResponse && msgResponse.data) || [];
+          // Only messages authored by the Page itself (from.id == page.id) —
+          // matches the pages_messaging use-case: admin-written lead summaries.
+          const pageAuthoredMessages = allMessages.filter(function (m) {
+            return m.from && m.from.id === page.id;
+          });
+
+          results.push({
+            conversation_id: thread.id,
+            participants: thread.participants,
+            updated_time: thread.updated_time,
+            page_authored_messages: pageAuthoredMessages
+          });
+
+          if (remaining === 0) {
+            setStatus('Retrieved messages for ' + threads.length + ' conversation thread(s).');
+            showOutput({ threads: results });
+          }
+        }
+      );
+    });
+  }
 </script>
 
 <script async defer crossorigin="anonymous"
