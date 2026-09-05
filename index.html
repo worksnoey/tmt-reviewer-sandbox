@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TMT Wrapup Lead — Reviewer Sandbox</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    max-width: 720px;
+    margin: 40px auto;
+    padding: 0 20px;
+    color: #1a1a1a;
+    line-height: 1.5;
+  }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  p.subtitle { color: #555; margin-top: 0; font-size: 14px; }
+  .panel {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 16px;
+    margin: 16px 0;
+  }
+  button {
+    background: #1877f2;
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button:disabled { background: #aaa; cursor: default; }
+  select { padding: 8px; font-size: 14px; margin-top: 8px; width: 100%; }
+  #status { font-size: 13px; color: #555; margin-top: 8px; }
+  pre {
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 12px;
+    overflow-x: auto;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .log-line { margin: 2px 0; }
+  .step-label { font-weight: 600; font-size: 13px; color: #333; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+
+<h1>TMT Wrapup Lead — Reviewer Sandbox</h1>
+<p class="subtitle">
+  This page is a web-based sandbox that uses the same App ID and requests the same
+  permissions (pages_show_list, pages_read_engagement, pages_messaging) as the
+  production Windows desktop application. It is provided so reviewers can test
+  permissions in a browser without installing desktop software.
+</p>
+
+<div id="fb-root"></div>
+
+<div class="panel">
+  <div class="step-label">Step 1 — Log in with Facebook</div>
+  <button id="login-btn">Continue with Facebook</button>
+  <div id="status">Not connected.</div>
+</div>
+
+<div class="panel" id="pages-panel" style="display:none;">
+  <div class="step-label">Step 2 — Select a Page you manage (pages_show_list)</div>
+  <select id="page-select"></select>
+  <div style="margin-top:10px;">
+    <button id="load-conversations-btn">Load conversations (pages_read_engagement + pages_messaging)</button>
+  </div>
+</div>
+
+<div class="panel" id="output-panel" style="display:none;">
+  <div class="step-label">Result</div>
+  <pre id="output"></pre>
+</div>
+
+<script>
+  // ---- CONFIGURATION ----
+  const FB_APP_ID = '1755718065394411';       // <-- replace with your real App ID
+  const FB_API_VERSION = 'v21.0';        // <-- match the version your app uses
+  const REQUESTED_SCOPES = 'pages_show_list,pages_read_engagement,pages_messaging';
+
+  let pagesData = [];
+
+  function setStatus(msg) {
+    document.getElementById('status').textContent = msg;
+  }
+
+  function showOutput(obj) {
+    document.getElementById('output-panel').style.display = 'block';
+    document.getElementById('output').textContent = JSON.stringify(obj, null, 2);
+  }
+
+  window.fbAsyncInit = function () {
+    FB.init({
+      appId: FB_APP_ID,
+      cookie: true,
+      xfbml: false,
+      version: FB_API_VERSION
+    });
+  };
+
+  document.getElementById('login-btn').addEventListener('click', function () {
+    setStatus('Opening Facebook login...');
+    FB.login(function (response) {
+      if (response.authResponse) {
+        setStatus('Logged in. Fetching Pages you manage (pages_show_list)...');
+        fetchPages();
+      } else {
+        setStatus('Login was cancelled or the permission was not granted.');
+      }
+    }, { scope: REQUESTED_SCOPES });
+  });
+
+  function fetchPages() {
+    FB.api('/me/accounts', function (response) {
+      if (!response || response.error) {
+        setStatus('Error calling /me/accounts: ' + JSON.stringify(response && response.error));
+        return;
+      }
+      pagesData = response.data || [];
+      const select = document.getElementById('page-select');
+      select.innerHTML = '';
+      pagesData.forEach(function (page, i) {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = page.name + ' (' + page.id + ')';
+        select.appendChild(opt);
+      });
+      document.getElementById('pages-panel').style.display = 'block';
+      setStatus('Loaded ' + pagesData.length + ' Page(s) this account manages.');
+      showOutput(response);
+    });
+  }
+
+  document.getElementById('load-conversations-btn').addEventListener('click', function () {
+    const idx = document.getElementById('page-select').value;
+    const page = pagesData[idx];
+    if (!page) return;
+
+    setStatus('Fetching conversations for "' + page.name + '"...');
+
+    // Page-level endpoints require the PAGE access token (returned per-page
+    // in the /me/accounts response above), not the user access token.
+    FB.api(
+      '/' + page.id + '/conversations',
+      'GET',
+      { access_token: page.access_token, fields: 'participants,updated_time,snippet' },
+      function (convResponse) {
+        if (!convResponse || convResponse.error) {
+          setStatus('Error calling /' + page.id + '/conversations: ' + JSON.stringify(convResponse && convResponse.error));
+          return;
+        }
+        setStatus('Retrieved ' + (convResponse.data ? convResponse.data.length : 0) + ' conversation thread(s).');
+        showOutput(convResponse);
+      }
+    );
+  });
+</script>
+
+<script async defer crossorigin="anonymous"
+  src="https://connect.facebook.net/en_US/sdk.js"></script>
+
+</body>
+</html>
