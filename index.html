@@ -175,7 +175,7 @@
     // returned by /me/accounts above (e.g. access granted via Business Manager
     // rather than as a direct Page admin). We only read id/name/access_token —
     // no ad accounts, insights, or billing data is requested.
-    FB.api('/' + businessId + '/owned_pages', function (response) {
+    FB.api('/' + businessId + '/owned_pages', { fields: 'id,name,access_token' }, function (response) {
       if (!response || response.error) {
         bizStatus.textContent = 'Error calling /' + businessId + '/owned_pages: ' + JSON.stringify(response && response.error);
         return;
