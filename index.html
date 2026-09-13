@@ -186,7 +186,10 @@
       businessPages.forEach(function (page) {
         const row = document.createElement('div');
         row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px solid #eee;';
-        row.innerHTML = '<span>' + page.name + ' (' + page.id + ')</span>';
+        const tokenInfo = page.access_token
+          ? ('token: ' + page.access_token.length + ' chars, starts "' + page.access_token.slice(0, 6) + '..."')
+          : 'token: MISSING';
+        row.innerHTML = '<span>' + page.name + ' (' + page.id + ') — <code style="font-size:11px;color:#a00;">' + tokenInfo + '</code></span>';
 
         const addBtn = document.createElement('button');
         addBtn.textContent = 'Add this Page';
