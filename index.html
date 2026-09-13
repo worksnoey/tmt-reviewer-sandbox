@@ -52,9 +52,10 @@
 <h1>TMT Wrapup Lead — Reviewer Sandbox</h1>
 <p class="subtitle">
   This page is a web-based sandbox that uses the same App ID and requests the same
-  permissions (pages_show_list, pages_read_engagement, pages_messaging) as the
-  production Windows desktop application. It is provided so reviewers can test
-  permissions in a browser without installing desktop software.
+  permissions (pages_show_list, pages_read_engagement, pages_messaging,
+  business_management) as the production Windows desktop application. It is
+  provided so reviewers can test permissions in a browser without installing
+  desktop software.
 </p>
 
 <div id="fb-root"></div>
@@ -73,6 +74,20 @@
   </div>
 </div>
 
+<div class="panel" id="business-panel" style="display:none;">
+  <div class="step-label">Step 3 — Optional: find a Page via Business Manager ID (business_management)</div>
+  <p style="font-size:13px;color:#555;margin-top:0;">
+    Pages that a user manages through a Business Manager / Business Asset Group
+    (rather than as a direct Page admin) are not always returned by /me/accounts
+    above. This fallback looks up Pages owned by a specific Business Manager instead.
+  </p>
+  <input type="text" id="business-id-input" placeholder="Business Manager ID (e.g. 123456789012345)"
+    style="padding:8px; font-size:14px; width:100%; box-sizing:border-box; margin-bottom:8px;">
+  <button id="find-business-pages-btn">Find Pages via Business Manager ID</button>
+  <div id="business-status" style="font-size:13px;color:#555;margin-top:8px;"></div>
+  <div id="business-results" style="margin-top:10px;"></div>
+</div>
+
 <div class="panel" id="output-panel" style="display:none;">
   <div class="step-label">Result</div>
   <pre id="output"></pre>
@@ -82,7 +97,7 @@
   // ---- CONFIGURATION ----
   const FB_APP_ID = '1755718065394411';       // <-- replace with your real App ID
   const FB_API_VERSION = 'v21.0';        // <-- match the version your app uses
-  const REQUESTED_SCOPES = 'pages_show_list,pages_read_engagement,pages_messaging';
+  const REQUESTED_SCOPES = 'pages_show_list,pages_read_engagement,pages_messaging,business_management';
 
   let pagesData = [];
 
@@ -132,10 +147,68 @@
         select.appendChild(opt);
       });
       document.getElementById('pages-panel').style.display = 'block';
+      document.getElementById('business-panel').style.display = 'block';
       setStatus('Loaded ' + pagesData.length + ' Page(s) this account manages.');
       showOutput(response);
     });
   }
+
+  document.getElementById('find-business-pages-btn').addEventListener('click', function () {
+    const businessId = document.getElementById('business-id-input').value.trim();
+    const bizStatus = document.getElementById('business-status');
+    const bizResults = document.getElementById('business-results');
+    bizResults.innerHTML = '';
+
+    if (!businessId) {
+      bizStatus.textContent = 'Please enter a Business Manager ID.';
+      return;
+    }
+
+    bizStatus.textContent = 'Looking up Pages owned by Business Manager ' + businessId + '...';
+
+    // Requires business_management. Used only as a fallback when a Page isn't
+    // returned by /me/accounts above (e.g. access granted via Business Manager
+    // rather than as a direct Page admin). We only read id/name/access_token —
+    // no ad accounts, insights, or billing data is requested.
+    FB.api('/' + businessId + '/owned_pages', function (response) {
+      if (!response || response.error) {
+        bizStatus.textContent = 'Error calling /' + businessId + '/owned_pages: ' + JSON.stringify(response && response.error);
+        return;
+      }
+      const businessPages = response.data || [];
+      bizStatus.textContent = 'Found ' + businessPages.length + ' Page(s) via this Business Manager.';
+
+      businessPages.forEach(function (page) {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px solid #eee;';
+        row.innerHTML = '<span>' + page.name + ' (' + page.id + ')</span>';
+
+        const addBtn = document.createElement('button');
+        addBtn.textContent = 'Add this Page';
+        addBtn.style.cssText = 'padding:4px 10px;font-size:12px;';
+        addBtn.addEventListener('click', function () {
+          // Merge into the Step 2 dropdown, same as a directly-managed Page.
+          const exists = pagesData.some(function (p) { return p.id === page.id; });
+          if (!exists) {
+            pagesData.push(page);
+            const select = document.getElementById('page-select');
+            const opt = document.createElement('option');
+            opt.value = pagesData.length - 1;
+            opt.textContent = page.name + ' (' + page.id + ') — via Business Manager';
+            select.appendChild(opt);
+            select.value = pagesData.length - 1;
+          }
+          bizStatus.textContent = '"' + page.name + '" added to the Page list above — you can now click "Load conversations."';
+        });
+
+        row.appendChild(addBtn);
+        bizResults.appendChild(row);
+      });
+
+      showOutput(response);
+    });
+  });
+
 
   document.getElementById('load-conversations-btn').addEventListener('click', function () {
     const idx = document.getElementById('page-select').value;
