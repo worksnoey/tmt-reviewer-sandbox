@@ -123,12 +123,17 @@
     setStatus('Opening Facebook login...');
     FB.login(function (response) {
       if (response.authResponse) {
-        setStatus('Logged in. Fetching Pages you manage (pages_show_list)...');
+        const granted = (response.authResponse.grantedScopes || '').split(',');
+        setStatus('Logged in. Granted scopes: ' + (granted.join(', ') || '(none reported)'));
+        if (!granted.includes('business_management')) {
+          document.getElementById('business-status').textContent =
+            '⚠️ business_management was NOT granted during login — the Business Manager ID lookup below will fail until you log out of Facebook entirely (or remove the app from Facebook Settings > Apps and Websites) and log in again, making sure to leave business_management checked on the consent screen.';
+        }
         fetchPages();
       } else {
         setStatus('Login was cancelled or the permission was not granted.');
       }
-    }, { scope: REQUESTED_SCOPES });
+    }, { scope: REQUESTED_SCOPES, auth_type: 'rerequest' });
   });
 
   function fetchPages() {
