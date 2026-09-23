@@ -7,7 +7,7 @@
 <style>
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
-    max-width: 760px;
+    max-width: 720px;
     margin: 40px auto;
     padding: 0 20px;
     color: #1a1a1a;
@@ -15,14 +15,12 @@
   }
   h1 { font-size: 20px; margin-bottom: 4px; }
   p.subtitle { color: #555; margin-top: 0; font-size: 14px; }
-  p.note { color: #555; font-size: 13px; margin: 6px 0 10px; }
   .panel {
     border: 1px solid #ddd;
     border-radius: 6px;
     padding: 16px;
     margin: 16px 0;
   }
-  .panel.compare { border-style: dashed; }
   button {
     background: #1877f2;
     color: white;
@@ -32,9 +30,7 @@
     font-size: 14px;
     cursor: pointer;
   }
-  button.secondary { background: #fff; color: #1877f2; border: 1px solid #1877f2; }
-  button:disabled { background: #aaa; border-color: #aaa; color: #fff; cursor: default; }
-  button:focus-visible { outline: 3px solid #93b8f5; outline-offset: 2px; }
+  button:disabled { background: #aaa; cursor: default; }
   select { padding: 8px; font-size: 14px; margin-top: 8px; width: 100%; }
   #status { font-size: 13px; color: #555; margin-top: 8px; }
   pre {
@@ -47,95 +43,46 @@
     white-space: pre-wrap;
     word-break: break-word;
   }
+  .log-line { margin: 2px 0; }
   .step-label { font-weight: 600; font-size: 13px; color: #333; margin-bottom: 6px; }
-  .summary { font-size: 14px; margin: 4px 0 10px; }
-  .summary strong { font-size: 16px; }
-  .table-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee; vertical-align: top; }
-  th { color: #555; font-weight: 600; border-bottom: 1px solid #ddd; }
-  .badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; white-space: nowrap; }
-  .badge.bp { background: #e7f0fe; color: #1558c0; }
-  .badge.da { background: #f0f0f0; color: #444; }
-  .perm-granted { color: #1b7f3b; }
-  .perm-declined { color: #b3261e; }
-  ul.perms { margin: 4px 0; padding-left: 20px; font-size: 13px; }
 </style>
 </head>
 <body>
 
 <h1>TMT Wrapup Lead — Reviewer Sandbox</h1>
 <p class="subtitle">
-  This page is a web-based sandbox that uses the same App ID, requests the same
-  permissions (pages_show_list, pages_read_engagement, pages_messaging,
-  business_management) and lists Pages with the same logic as the production
-  Windows desktop application. It is provided so reviewers can test permissions
-  in a browser without installing desktop software.
+  This page is a web-based sandbox that uses the same App ID and requests the same
+  permissions (pages_show_list, pages_read_engagement, pages_messaging) as the
+  production Windows desktop application. It is provided so reviewers can test
+  permissions in a browser without installing desktop software.
 </p>
 
 <div id="fb-root"></div>
 
 <div class="panel">
   <div class="step-label">Step 1 — Log in with Facebook</div>
-  <p class="note">
-    In the Facebook dialog, select the Business(es) and every Page you want to connect.
-    business_management is used only so that Pages owned by a Business Portfolio are
-    returned by /me/accounts. This app never creates, edits or deletes anything in
-    Business Manager and never calls any /{business-id} endpoint.
-  </p>
   <button id="login-btn">Continue with Facebook</button>
-  <div id="status" role="status" aria-live="polite">Not connected.</div>
-</div>
-
-<div class="panel compare">
-  <div class="step-label">Optional — Compare without business_management</div>
-  <p class="note">
-    Removes only the business_management permission from this app, then lists Pages again
-    with the other three permissions. Pages owned by a Business Portfolio are missing or
-    incomplete in this mode. Click "Continue with Facebook" afterwards to grant
-    business_management again and see the full list.
-  </p>
-  <button id="compare-btn" class="secondary">List Pages without business_management</button>
-</div>
-
-<div class="panel" id="perms-panel" style="display:none;">
-  <div class="step-label">Granted permissions (GET /me/permissions)</div>
-  <ul class="perms" id="perms-list"></ul>
+  <div id="status">Not connected.</div>
 </div>
 
 <div class="panel" id="pages-panel" style="display:none;">
-  <div class="step-label">Step 2 — Pages returned by /me/accounts (pages_show_list)</div>
-  <div class="summary" id="pages-summary"></div>
-  <p class="note" id="pages-fallback-note" style="display:none;"></p>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Page</th><th>Page ID</th><th>Access via</th></tr></thead>
-      <tbody id="pages-table"></tbody>
-    </table>
-  </div>
-  <div style="margin-top:14px;">
-    <label for="page-select" class="step-label">Step 3 — Select a Page and load its conversations</label>
-    <select id="page-select"></select>
-    <div style="margin-top:10px;">
-      <button id="load-conversations-btn">Load conversations (pages_read_engagement + pages_messaging)</button>
-    </div>
+  <div class="step-label">Step 2 — Select a Page you manage (pages_show_list)</div>
+  <select id="page-select"></select>
+  <div style="margin-top:10px;">
+    <button id="load-conversations-btn">Load conversations (pages_read_engagement + pages_messaging)</button>
   </div>
 </div>
 
 <div class="panel" id="output-panel" style="display:none;">
-  <div class="step-label">Result (access tokens are hidden)</div>
+  <div class="step-label">Result</div>
   <pre id="output"></pre>
 </div>
 
 <script>
-  // ---- CONFIGURATION (kept in sync with core/fbOAuth.js of the desktop app) ----
-  const FB_APP_ID      = '1755718065394411';
-  const FB_API_VERSION = 'v20.0';
-  const SCOPES_FULL    = 'pages_show_list,pages_read_engagement,pages_messaging,business_management';
-  const SCOPES_BASIC   = 'pages_show_list,pages_read_engagement,pages_messaging';
-  const FULL_FIELDS    = 'id,name,access_token,tasks,business';
-  const BASIC_FIELDS   = 'id,name,access_token,tasks';
-  const GRAPH          = 'https://graph.facebook.com/' + FB_API_VERSION;
+  // ---- CONFIGURATION ----
+  const FB_APP_ID = '1755718065394411';       // <-- replace with your real App ID
+  const FB_API_VERSION = 'v21.0';        // <-- match the version your app uses
+  const REQUESTED_SCOPES = 'pages_show_list,pages_read_engagement,pages_messaging';
 
   let pagesData = [];
 
@@ -143,214 +90,53 @@
     document.getElementById('status').textContent = msg;
   }
 
-  // Never print access tokens on screen (screencasts, screenshots).
-  function redact(obj) {
-    return JSON.parse(JSON.stringify(obj, function (key, value) {
-      return key === 'access_token' ? '[hidden]' : value;
-    }));
-  }
-
   function showOutput(obj) {
     document.getElementById('output-panel').style.display = 'block';
-    document.getElementById('output').textContent = JSON.stringify(redact(obj), null, 2);
-  }
-
-  function userToken() {
-    const auth = FB.getAuthResponse();
-    return auth && auth.accessToken;
-  }
-
-  async function graphGet(url) {
-    const res = await fetch(url);
-    const json = await res.json();
-    if (json.error) {
-      const err = new Error(json.error.message);
-      err.fbError = json.error;
-      throw err;
-    }
-    return json;
+    document.getElementById('output').textContent = JSON.stringify(obj, null, 2);
   }
 
   window.fbAsyncInit = function () {
-    FB.init({ appId: FB_APP_ID, cookie: true, xfbml: false, version: FB_API_VERSION });
+    FB.init({
+      appId: FB_APP_ID,
+      cookie: true,
+      xfbml: false,
+      version: FB_API_VERSION
+    });
   };
 
-  function fbLogin(scope) {
-    return new Promise(function (resolve) {
-      FB.login(function (response) { resolve(response); }, { scope: scope, auth_type: 'rerequest' });
-    });
-  }
-
-  // ------------------------------------------------------------------
-  // Main login — same scopes as the desktop app
-  // ------------------------------------------------------------------
-  document.getElementById('login-btn').addEventListener('click', async function () {
+  document.getElementById('login-btn').addEventListener('click', function () {
     setStatus('Opening Facebook login...');
-    const response = await fbLogin(SCOPES_FULL);
-    if (!response.authResponse) {
-      setStatus('Login was cancelled or the permission was not granted.');
-      return;
-    }
-    await showPermissions();
-    await fetchPages('with business_management');
-  });
-
-  // ------------------------------------------------------------------
-  // Comparison — remove business_management only, then list Pages again
-  // ------------------------------------------------------------------
-  document.getElementById('compare-btn').addEventListener('click', async function () {
-    setStatus('Opening Facebook login (without business_management)...');
-    const response = await fbLogin(SCOPES_BASIC);
-    if (!response.authResponse) {
-      setStatus('Login was cancelled or the permission was not granted.');
-      return;
-    }
-
-    setStatus('Removing business_management from this app...');
-    try {
-      const res = await fetch(GRAPH + '/me/permissions/business_management?access_token='
-        + encodeURIComponent(userToken()), { method: 'DELETE' });
-      const json = await res.json();
-      if (json.error) throw new Error(json.error.message);
-    } catch (err) {
-      setStatus('Could not remove business_management: ' + err.message);
-      return;
-    }
-
-    await showPermissions();
-    await fetchPages('without business_management');
-  });
-
-  // ------------------------------------------------------------------
-  // GET /me/permissions — shows what the current grant contains
-  // ------------------------------------------------------------------
-  async function showPermissions() {
-    const list = document.getElementById('perms-list');
-    list.innerHTML = '';
-    try {
-      const json = await graphGet(GRAPH + '/me/permissions?access_token=' + encodeURIComponent(userToken()));
-      const relevant = SCOPES_FULL.split(',');
-      relevant.forEach(function (name) {
-        const entry = (json.data || []).find(function (p) { return p.permission === name; });
-        const status = entry ? entry.status : 'not granted';
-        const li = document.createElement('li');
-        li.textContent = name + ': ' + status;
-        li.className = status === 'granted' ? 'perm-granted' : 'perm-declined';
-        list.appendChild(li);
-      });
-      document.getElementById('perms-panel').style.display = 'block';
-    } catch (err) {
-      const li = document.createElement('li');
-      li.textContent = 'Could not read /me/permissions: ' + err.message;
-      list.appendChild(li);
-      document.getElementById('perms-panel').style.display = 'block';
-    }
-  }
-
-  // ------------------------------------------------------------------
-  // /me/accounts — same logic as getPages() in the desktop app:
-  // request the "business" field, follow paging, and if Facebook rejects the
-  // whole request with error 200 "Requires business_management permission",
-  // retry without the "business" field.
-  // ------------------------------------------------------------------
-  async function fetchAccounts(fields) {
-    const pages = [];
-    let url = GRAPH + '/me/accounts?limit=100&fields=' + encodeURIComponent(fields)
-      + '&access_token=' + encodeURIComponent(userToken());
-    let lastResponse = null;
-    while (url) {
-      const json = await graphGet(url);
-      lastResponse = json;
-      pages.push.apply(pages, json.data || []);
-      url = (json.paging && json.paging.next) || null;
-    }
-    return { pages: pages, lastResponse: lastResponse };
-  }
-
-  async function fetchPages(modeLabel) {
-    setStatus('Fetching Pages you manage (pages_show_list)...');
-    const fallbackNote = document.getElementById('pages-fallback-note');
-    fallbackNote.style.display = 'none';
-
-    let result;
-    let usedFallback = false;
-    try {
-      try {
-        result = await fetchAccounts(FULL_FIELDS);
-      } catch (err) {
-        const e = err.fbError;
-        const isBusinessPermError = e && e.code === 200
-          && /business_management permission/i.test(e.message || '');
-        if (!isBusinessPermError) throw err;
-        usedFallback = true;
-        result = await fetchAccounts(BASIC_FIELDS);
-      }
-    } catch (err) {
-      setStatus('Error calling /me/accounts: ' + err.message);
-      showOutput(err.fbError || { error: err.message });
-      return;
-    }
-
-    pagesData = result.pages;
-    renderPages(modeLabel);
-
-    if (usedFallback) {
-      fallbackNote.textContent = 'Facebook did not allow the "business" field for at least one Business, '
-        + 'so Pages were listed without it and are labelled "Direct admin" (same behaviour as the desktop app).';
-      fallbackNote.style.display = 'block';
-    }
-
-    setStatus('Loaded ' + pagesData.length + ' Page(s) ' + modeLabel + '.');
-    showOutput({ mode: modeLabel, fallback_without_business_field: usedFallback, data: pagesData });
-  }
-
-  function renderPages(modeLabel) {
-    const bpCount = pagesData.filter(function (p) { return p.business; }).length;
-    const summary = document.getElementById('pages-summary');
-    summary.innerHTML = '';
-    const strong = document.createElement('strong');
-    strong.textContent = pagesData.length + ' Page(s)';
-    summary.appendChild(strong);
-    summary.appendChild(document.createTextNode(
-      ' returned ' + modeLabel + ' — Business Portfolio: ' + bpCount
-      + ', Direct admin: ' + (pagesData.length - bpCount)));
-
-    const tbody = document.getElementById('pages-table');
-    tbody.innerHTML = '';
-    const select = document.getElementById('page-select');
-    select.innerHTML = '';
-
-    pagesData.forEach(function (page, i) {
-      const tr = document.createElement('tr');
-      const tdName = document.createElement('td');
-      tdName.textContent = page.name;
-      const tdId = document.createElement('td');
-      tdId.textContent = page.id;
-      const tdSrc = document.createElement('td');
-      const badge = document.createElement('span');
-      if (page.business) {
-        badge.className = 'badge bp';
-        badge.textContent = 'Business Portfolio (' + (page.business.name || page.business.id) + ')';
+    FB.login(function (response) {
+      if (response.authResponse) {
+        setStatus('Logged in. Fetching Pages you manage (pages_show_list)...');
+        fetchPages();
       } else {
-        badge.className = 'badge da';
-        badge.textContent = 'Direct admin';
+        setStatus('Login was cancelled or the permission was not granted.');
       }
-      tdSrc.appendChild(badge);
-      tr.appendChild(tdName); tr.appendChild(tdId); tr.appendChild(tdSrc);
-      tbody.appendChild(tr);
+    }, { scope: REQUESTED_SCOPES, auth_type: 'rerequest' });
+  });
 
-      const opt = document.createElement('option');
-      opt.value = i;
-      opt.textContent = page.name + ' (' + page.id + ')';
-      select.appendChild(opt);
+  function fetchPages() {
+    FB.api('/me/accounts', function (response) {
+      if (!response || response.error) {
+        setStatus('Error calling /me/accounts: ' + JSON.stringify(response && response.error));
+        return;
+      }
+      pagesData = response.data || [];
+      const select = document.getElementById('page-select');
+      select.innerHTML = '';
+      pagesData.forEach(function (page, i) {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = page.name + ' (' + page.id + ')';
+        select.appendChild(opt);
+      });
+      document.getElementById('pages-panel').style.display = 'block';
+      setStatus('Loaded ' + pagesData.length + ' Page(s) this account manages.');
+      showOutput(response);
     });
-
-    document.getElementById('pages-panel').style.display = 'block';
   }
 
-  // ------------------------------------------------------------------
-  // Conversations + Page-authored messages (unchanged from previous sandbox)
-  // ------------------------------------------------------------------
   document.getElementById('load-conversations-btn').addEventListener('click', function () {
     const idx = document.getElementById('page-select').value;
     const page = pagesData[idx];
