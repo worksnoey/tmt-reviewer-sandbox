@@ -84,6 +84,7 @@
     returned by /me/accounts. This app never creates, edits or deletes anything in
     Business Manager and never calls any /{business-id} endpoint.
   </p>
+  <p class="note" id="requested-scopes"></p>
   <button id="login-btn">Continue with Facebook</button>
   <div id="status" role="status" aria-live="polite">Not connected.</div>
 </div>
@@ -131,7 +132,7 @@
     <label for="page-select" class="step-label">Step 3 — Select a Page and load its conversations</label>
     <select id="page-select"></select>
     <div style="margin-top:10px;">
-      <button id="load-conversations-btn">Load conversations (pages_read_engagement + pages_messaging)</button>
+      <button id="load-conversations-btn">Load conversations</button>
     </div>
   </div>
 </div>
@@ -143,16 +144,32 @@
 
 <script>
   // ---- CONFIGURATION (kept in sync with core/fbOAuth.js of the desktop app) ----
-  const FB_APP_ID      = '1755718065394411';
+  const FB_APP_ID      = '1115579377510346';
   const FB_API_VERSION = 'v20.0';
-  const SCOPES_FULL    = 'pages_show_list,pages_read_engagement,pages_messaging,business_management';
-  const SCOPES_BASIC   = 'pages_show_list,pages_read_engagement,pages_messaging';
+
+  // Test switch: open the page with ?noRE=1 to log in WITHOUT pages_read_engagement
+  // (to check whether conversations/messages still work with pages_messaging only).
+  // Remember to click A first so the old grant does not still include it.
+  const WITHOUT_READ_ENGAGEMENT = new URLSearchParams(location.search).get('noRE') === '1';
+  const PAGE_SCOPES  = ['pages_show_list']
+    .concat(WITHOUT_READ_ENGAGEMENT ? [] : ['pages_read_engagement'])
+    .concat(['pages_messaging']);
+  const SCOPES_FULL  = PAGE_SCOPES.concat(['business_management']).join(',');
+  const SCOPES_BASIC = PAGE_SCOPES.join(',');
+  // Always list all four in the "Granted permissions" panel, so a missing one shows as "not granted".
+  const ALL_KNOWN_SCOPES = ['pages_show_list', 'pages_read_engagement', 'pages_messaging', 'business_management'];
   const FULL_FIELDS    = 'id,name,access_token,tasks,business';
   const BASIC_FIELDS   = 'id,name,access_token,tasks';
   const GRAPH          = 'https://graph.facebook.com/' + FB_API_VERSION;
 
   let pagesData = [];
-  let permissionsCleared = false;   // true right after A — B and C require a fresh login
+  let permissionsCleared = false;
+
+  document.getElementById('requested-scopes').textContent = 'Requested permissions: '
+    + SCOPES_FULL.split(',').join(', ')
+    + (WITHOUT_READ_ENGAGEMENT ? ' (test mode: without pages_read_engagement)' : '');
+  document.getElementById('load-conversations-btn').textContent =
+    'Load conversations (' + PAGE_SCOPES.filter(function (x) { return x !== 'pages_show_list'; }).join(' + ') + ')';   // true right after A — B and C require a fresh login
 
   function setStatus(msg) {
     document.getElementById('status').textContent = msg;
@@ -296,8 +313,7 @@
     list.innerHTML = '';
     try {
       const json = await graphGet(GRAPH + '/me/permissions?access_token=' + encodeURIComponent(userToken()));
-      const relevant = SCOPES_FULL.split(',');
-      relevant.forEach(function (name) {
+      ALL_KNOWN_SCOPES.forEach(function (name) {
         const entry = (json.data || []).find(function (p) { return p.permission === name; });
         const status = entry ? entry.status : 'not granted';
         const li = document.createElement('li');
@@ -475,6 +491,7 @@
         function (msgResponse) {
           remaining -= 1;
 
+          const msgError = (!msgResponse || msgResponse.error) ? (msgResponse && msgResponse.error) || { message: 'No response' } : null;
           const allMessages = (msgResponse && msgResponse.data) || [];
           // Only messages authored by the Page itself (from.id == page.id) —
           // matches the pages_messaging use-case: admin-written lead summaries.
@@ -486,11 +503,15 @@
             conversation_id: thread.id,
             participants: thread.participants,
             updated_time: thread.updated_time,
+            messages_error: msgError,
             page_authored_messages: pageAuthoredMessages
           });
 
           if (remaining === 0) {
-            setStatus('Retrieved messages for ' + threads.length + ' conversation thread(s).');
+            const failed = results.filter(function (r) { return r.messages_error; }).length;
+            setStatus(failed
+              ? 'Could not read messages for ' + failed + ' of ' + threads.length + ' conversation thread(s) — see the error in Result.'
+              : 'Retrieved messages for ' + threads.length + ' conversation thread(s).');
             showOutput({ threads: results });
           }
         }
