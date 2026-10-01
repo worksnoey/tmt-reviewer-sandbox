@@ -68,8 +68,7 @@
 <h1>Dealer Wrapup Lead — Reviewer Sandbox</h1>
 <p class="subtitle">
   This page is a web-based sandbox that uses the same App ID, requests the same
-  permissions (pages_show_list, pages_read_engagement, pages_messaging,
-  business_management) and lists Pages with the same logic as the production
+  permissions (pages_show_list, pages_messaging, business_management) and lists Pages with the same logic as the production
   Windows desktop application. It is provided so reviewers can test permissions
   in a browser without installing desktop software.
 </p>
@@ -145,19 +144,13 @@
 <script>
   // ---- CONFIGURATION (kept in sync with core/fbOAuth.js of the desktop app) ----
   const FB_APP_ID      = '1115579377510346';
-  const FB_API_VERSION = 'v20.0';
+  const FB_API_VERSION = 'v26.0';
 
-  // Test switch: open the page with ?noRE=1 to log in WITHOUT pages_read_engagement
-  // (to check whether conversations/messages still work with pages_messaging only).
-  // Remember to click A first so the old grant does not still include it.
-  const WITHOUT_READ_ENGAGEMENT = new URLSearchParams(location.search).get('noRE') === '1';
-  const PAGE_SCOPES  = ['pages_show_list']
-    .concat(WITHOUT_READ_ENGAGEMENT ? [] : ['pages_read_engagement'])
-    .concat(['pages_messaging']);
+  const PAGE_SCOPES  = ['pages_show_list', 'pages_messaging'];
   const SCOPES_FULL  = PAGE_SCOPES.concat(['business_management']).join(',');
   const SCOPES_BASIC = PAGE_SCOPES.join(',');
   // Always list all four in the "Granted permissions" panel, so a missing one shows as "not granted".
-  const ALL_KNOWN_SCOPES = ['pages_show_list', 'pages_read_engagement', 'pages_messaging', 'business_management'];
+  const ALL_KNOWN_SCOPES = ['pages_show_list', 'pages_messaging', 'business_management'];
   const FULL_FIELDS    = 'id,name,access_token,tasks,business';
   const BASIC_FIELDS   = 'id,name,access_token,tasks';
   const GRAPH          = 'https://graph.facebook.com/' + FB_API_VERSION;
@@ -166,8 +159,7 @@
   let permissionsCleared = false;
 
   document.getElementById('requested-scopes').textContent = 'Requested permissions: '
-    + SCOPES_FULL.split(',').join(', ')
-    + (WITHOUT_READ_ENGAGEMENT ? ' (test mode: without pages_read_engagement)' : '');
+    + SCOPES_FULL.split(',').join(', ');
   document.getElementById('load-conversations-btn').textContent =
     'Load conversations (' + PAGE_SCOPES.filter(function (x) { return x !== 'pages_show_list'; }).join(' + ') + ')';   // true right after A — B and C require a fresh login
 
